@@ -1,0 +1,201 @@
+BootStrap: docker
+From: centos:8.1.1911
+%post
+#    . /.singularity.d/env/10-docker*.sh
+    export OFED_VERSION="5.2-2.2.0.0"
+    export UCX_VERSION="1.10.0"
+    export OMPI_VERSION="4.1.0"
+
+# GNU compiler
+%post
+    yum install -y gcc-toolset-9-gcc gcc-toolset-9-gcc-c++ gcc-toolset-9-gcc-gfortran
+    rm -rf /var/cache/yum/*
+
+%environment
+    export PATH=/opt/rh/gcc-toolset-9/root/usr/bin:$PATH
+
+%post
+    export PATH=/opt/rh/gcc-toolset-9/root/usr/bin:$PATH
+
+# Mellanox OFED 
+%post
+    yum install -y \
+        ca-certificates \
+        gnupg \
+        wget
+    rm -rf /var/cache/yum/*
+%post
+    rpm --import https://www.mellanox.com/downloads/ofed/RPM-GPG-KEY-Mellanox
+    yum install -y yum-utils
+    yum-config-manager --add-repo https://linux.mellanox.com/public/repo/mlnx_ofed/${OFED_VERSION}/rhel8.1/mellanox_mlnx_ofed.repo
+    yum install -y \
+        libibumad \
+        libibverbs \
+        libibverbs-utils \
+        librdmacm \
+        rdma-core \
+        rdma-core-devel
+    rm -rf /var/cache/yum/*
+
+# Install GCC 9.2.0  
+%post
+    yum install -y \
+    bzip2 \
+    which \
+    m4 \
+    make
+    rm -rf /var/cache/yum/*
+
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp ftp://gcc.gnu.org/pub/gcc/infrastructure/gmp-6.1.0.tar.bz2
+    cd /var/tmp/
+    tar -xf gmp-6.1.0.tar.bz2
+    cd ./gmp-6.1.0
+    ./configure && make -j 60 &&  make install
+    cd ..
+    wget -q -nc --no-check-certificate -P /var/tmp ftp://gcc.gnu.org/pub/gcc/infrastructure/mpfr-3.1.4.tar.bz2
+    tar -xf mpfr-3.1.4.tar.bz2
+    cd mpfr-3.1.4
+    ./configure && make -j 60 &&  make install
+    cd ..
+    wget -q -nc --no-check-certificate -P /var/tmp ftp://gcc.gnu.org/pub/gcc/infrastructure/mpc-1.0.3.tar.gz
+    tar -xf mpc-1.0.3.tar.gz
+    cd mpc-1.0.3
+    ./configure && make -j 60 &&  make install
+    cd ..
+    wget -q -nc --no-check-certificate -P /var/tmp https://ftp.gnu.org/gnu/gcc/gcc-9.2.0/gcc-9.2.0.tar.gz
+    tar -xf gcc-9.2.0.tar.gz
+    cd gcc-9.2.0
+    ./configure --disable-multilib --prefix=/opt/gcc-9.2.0 && make -j 100 && make -j 100 install
+    cd ..
+    cd /
+    rm -rf /var/tmp/*
+
+    ln -sf /opt/gcc-9.2.0/bin/cpp /lib/cpp
+
+%environment
+    export PATH=/opt/gcc-9.2.0/bin:$PATH
+    export LIBRARY_PATH=/opt/gcc-9.2.0/lib64:$LIBRARY_PATH
+    export LD_LIBRARY_PATH=/opt/gcc-9.2.0/lib64:$LD_LIBRARY_PATH
+    export CPATH=/opt/gcc-9.2.0/include:$CPATH
+
+    export CC=/opt/gcc-9.2.0/bin/gcc
+    export GCC=/opt/gcc-9.2.0/bin/gcc 
+
+%post
+    export PATH=/opt/gcc-9.2.0/bin:$PATH
+    export LIBRARY_PATH=/opt/gcc-9.2.0/lib64:$LIBRARY_PATH
+    export LD_LIBRARY_PATH=/opt/gcc-9.2.0/lib64:$LD_LIBRARY_PATH
+    export CPATH=/opt/gcc-9.2.0/include:$CPATH
+
+    export CC=/opt/gcc-9.2.0/bin/gcc
+    export GCC=/opt/gcc-9.2.0/bin/gcc
+
+# UCX
+# https://github.com/openucx/ucx/releases
+%post
+    yum install -y \
+        binutils-devel \
+        file \
+        make \
+        numactl-devel \
+        wget
+    rm -rf /var/cache/yum/*
+%post
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://github.com/openucx/ucx/releases/download/v${UCX_VERSION}/ucx-${UCX_VERSION}.tar.gz
+    mkdir -p /var/tmp && tar -x -f /var/tmp/ucx-${UCX_VERSION}.tar.gz -C /var/tmp -z
+    cd /var/tmp/ucx-${UCX_VERSION} &&   ./configure --prefix=/usr/local/ucx --disable-assertions --disable-debug --disable-doxygen-doc --disable-logging --disable-params-check --enable-optimizations --without-cuda
+    make -j 60
+    make -j 60 install
+    rm -rf /var/tmp/ucx-${UCX_VERSION} /var/tmp/ucx-${UCX_VERSION}.tar.gz
+%environment
+    export CPATH=/usr/local/ucx/include:$CPATH
+    export LD_LIBRARY_PATH=/usr/local/ucx/lib:$LD_LIBRARY_PATH
+    export LIBRARY_PATH=/usr/local/ucx/lib:$LIBRARY_PATH
+    export PATH=/usr/local/ucx/bin:$PATH
+%post
+    export CPATH=/usr/local/ucx/include:$CPATH
+    export LD_LIBRARY_PATH=/usr/local/ucx/lib:$LD_LIBRARY_PATH
+    export LIBRARY_PATH=/usr/local/ucx/lib:$LIBRARY_PATH
+    export PATH=/usr/local/ucx/bin:$PATH
+
+# OpenMPI
+%post
+    yum install -y \
+        bzip2 \
+        file \
+        hwloc \
+        make \
+        numactl-devel \
+        openssh-clients \
+        perl \
+        tar \
+        wget
+    rm -rf /var/cache/yum/*
+%post
+    cd /
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.open-mpi.org/software/ompi/v4.1/downloads/openmpi-${OMPI_VERSION}.tar.bz2
+    mkdir -p /var/tmp && tar -x -f /var/tmp/openmpi-${OMPI_VERSION}.tar.bz2 -C /var/tmp -j
+    cd /var/tmp/openmpi-${OMPI_VERSION} &&   ./configure --prefix=/opt/openmpi-${OMPI_VERSION} --disable-getpwuid --enable-orterun-prefix-by-default --enable-mpirun-prefix-by-default --with-platform=contrib/platform/mellanox/optimized --with-ucx=/usr/local/ucx --with-verbs --without-cuda
+    make -j 60
+    make -j 60 install
+    rm -rf /var/tmp/openmpi-${OMPI_VERSION} /var/tmp/openmpi-${OMPI_VERSION}.tar.bz2
+
+#    yum install environment-modules tcl -y
+
+#    source /etc/profile.d/modules.sh
+#    rm -rf /var/cache/yum/*
+
+    mkdir -p /usr/share/Modules/modulefiles/mpi/ 
+
+cat << EOF >> /usr/share/Modules/modulefiles/mpi/openmpi-${OMPI_VERSION}
+#%Module 1.0
+#
+#  OpenMPI ${OMPI_VERSION}
+#
+conflict        mpi
+#module load 9.2.0
+prepend-path    PATH            /opt/openmpi-${OMPI_VERSION}/bin
+prepend-path    LD_LIBRARY_PATH /opt/openmpi-${OMPI_VERSION}/lib
+prepend-path    MANPATH         /opt/openmpi-${OMPI_VERSION}/share/man
+setenv          MPI_BIN         /opt/openmpi-${OMPI_VERSION}/bin
+setenv          MPI_INCLUDE     /opt/openmpi-${OMPI_VERSION}/include
+setenv          MPI_LIB         /opt/openmpi-${OMPI_VERSION}/lib
+setenv          MPI_MAN         /opt/openmpi-${OMPI_VERSION}/share/man
+setenv          MPI_HOME        /opt/openmpi-${OMPI_VERSION}
+EOF
+
+cat << EOF >> /usr/share/Modules/modulefiles/gcc-9.2.0
+#%Module 1.0
+#
+#  GCC 9.2.0
+#
+prepend-path    PATH            /opt/gcc-9.2.0/bin
+prepend-path    LD_LIBRARY_PATH /opt/gcc-9.2.0/lib64
+setenv          CC              /opt/gcc-9.2.0/bin/gcc
+setenv          GCC             /opt/gcc-9.2.0/bin/gcc
+setenv          CPP             /opt/gcc-9.2.0/bin/cpp
+EOF
+
+    ln -s /usr/share/Modules/modulefiles/mpi/openmpi-${OMPI_VERSION} /usr/share/Modules/modulefiles/mpi/openmpi
+
+%environment
+    export LD_LIBRARY_PATH=/opt/openmpi-${OMPI_VERSION}/lib:$LD_LIBRARY_PATH
+    export PATH=/opt/openmpi-${OMPI_VERSION}/bin:$PATH
+    source /etc/profile.d/modules.sh >> $SINGULARITY_ENVIRONMENT
+    source /etc/profile.d/modules.sh
+%post
+    export LD_LIBRARY_PATH=/opt/openmpi-${OMPI_VERSION}/lib:$LD_LIBRARY_PATH
+    export PATH=/opt/openmpi-${OMPI_VERSION}/bin:$PATH
+
+%files
+    mpi_bandwidth.c /home/mpi_bandwidth.c
+
+%post
+    cd /
+#    mpicc -o /usr/local/bin/mpi_bandwidth /home/mpi_bandwidth.c
+
+%post 
+     source /etc/profile.d/modules.sh
+

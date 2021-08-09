@@ -1,0 +1,113 @@
+Bootstrap: localimage
+From: /share/home/hpcuser/amir-works/CentOS8-env-clean.sif
+
+#Install Spack
+%post
+    export SKU=hbv3
+    export OMPI_VERSION="4.1.0"
+
+    yum install -y \
+    csh \
+    time \
+    git \
+    python3
+    rm -rf /var/cache/yum/*
+
+    cd /home
+
+    source /etc/profile.d/modules.sh
+
+    pip3 install --upgrade pip
+    python3 -m pip install wheel
+    pip3 install pathlib
+
+    mkdir -p /apps/spack
+    module load gcc-9.2.0
+    module load mpi/openmpi
+
+%post
+
+# Speed up yum
+#    yum install -y yum-plugin-fastestmirror
+#    yum install -y deltarpm
+ 
+    source /etc/profile.d/modules.sh
+    module load gcc-9.2.0
+    module load mpi/openmpi
+
+#spack dependencies
+    yum -y install git python2 python3 \
+    curl \
+    gnupg2 sed patch \
+    unzip gzip bzip2 \
+    findutils make vim \
+    environment-modules
+
+    yum clean all
+
+    cd /home
+    git clone https://github.com/Azure/azurehpc
+    cd azurehpc/apps/spack
+
+    yum update python3
+    pip3 install --upgrade pip
+    python3 -m pip install wheel
+    pip3 install pathlib 
+    sed -i -e 's/sudo//g' build_spack.sh
+    bash build_spack.sh hbv3 
+
+    source /apps/spack/0.16.0/spack/share/spack/setup-env.sh
+
+    source /etc/profile.d/modules.sh
+    module load gcc-9.2.0
+    module load mpi/openmpi
+    
+    #setup compilers.yaml
+    spack compiler find --scope system $(which gcc)
+    spack compiler find --scope system $(which g++)
+    spack compiler find --scope system $(which gfortran)
+
+    mkdir -p /root/.spack/
+    cd /root/.spack/
+    cp /apps/spack/0.16.0/spack/etc/spack/defaults/packages.yaml .
+    sed -i '6d' packages.yaml
+    sed -i "s/- mpi\/openmpi/prefix: \/opt\/openmpi-${OMPI_VERSION}/" packages.yaml
+
+    sed -i "s/openmpi@4.0.5/openmpi@${OMPI_VERSION}/g" packages.yaml
+    
+
+#Install WRF
+#%post
+    export SKU=hbv3
+#    export OMPI_VERSION="4.1.0"
+
+    source /etc/profile.d/modules.sh
+    . /apps/spack/0.16.0/spack/share/spack/setup-env.sh
+    module purge
+    module load gcc-9.2.0
+    module load mpi/openmpi-${OMPI_VERSION}
+
+    spack compiler find  
+
+    cd /home/azurehpc/apps/wrf
+    sed -i -e 's/sudo//g' build_wrf.sh
+    sed -i -e "s/MPI_VER=4.0.5/MPI_VER=${OMPI_VERSION}/g" build_wrf.sh
+    sed -i -e 's/spack install  netcdf-fortran/spack install --no-check-signature netcdf-fortran/g' build_wrf.sh
+    sed -i -e '122 a dnf config-manager --set-enabled PowerTools -y' build_wrf.sh
+    ./build_wrf.sh openmpi $SKU
+    spack clean -a
+    spack gc -y
+
+%runscript
+    spack help
+
+%files
+    mpi_bandwidth.c /home/mpi_bandwidth.c
+
+%post
+    cd /
+    mpicc -o /usr/local/bin/mpi_bandwidth /home/mpi_bandwidth.c
+
+%post 
+     source /etc/profile.d/modules.sh
+
