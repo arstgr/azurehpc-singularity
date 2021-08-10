@@ -98,6 +98,39 @@ From: /share/home/hpcuser/amir-works/CentOS8-env-clean.sif
     spack clean -a
     spack gc -y
 
+#load WRF
+%post
+    . /apps/spack/0.16.0/spack/share/spack/setup-env.sh
+    export PATH=$(spack location -i netcdf-fortran^openmpi)/bin:$PATH
+    export PATH=$(spack location -i hdf5^openmpi)/bin:$PATH
+    export PATH=$(spack location -i perl)/bin:$PATH
+
+    export SKU=hbv3
+    source /etc/profile.d/modules.sh
+    module use /apps/modulefiles/${SKU}/
+    module load wrf/4.1.5-openmpi
+
+    export WRFROOT=$WRFROOT
+    export PATH=$WRFROOT/main:$PATH
+
+    export LIBRARY_PATH=$(spack location -i netcdf-fortran^openmpi)/lib:$LIBRARY_PATH
+    export LIBRARY_PATH=$(spack location -i hdf5^openmpi)/lib:$LIBRARY_PATH
+    export LIBRARY_PATH=$(spack location -i perl)/lib:$LIBRARY_PATH
+
+    export LD_LIBRARY_PATH=$(spack location -i netcdf-fortran^openmpi)/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=$(spack location -i hdf5^openmpi)/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=$(spack location -i perl)/lib:$LD_LIBRARY_PATH
+
+    echo PATH=$PATH >> $SINGULARITY_ENVIRONMENT
+    echo LIBRARY_PATH=$LIBRARY_PATH  >> $SINGULARITY_ENVIRONMENT
+    echo LD_LIBRARY_PATH=$LD_LIBRARY_PATH  >> $SINGULARITY_ENVIRONMENT
+
+#remove remaining files
+    cd /home
+    rm -r azurehpc
+    cd /apps/hbv3/wrf-openmpi
+    rm *.tar.gz
+
 %runscript
     spack help
 
