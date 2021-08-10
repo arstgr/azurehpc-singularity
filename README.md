@@ -7,6 +7,8 @@ CentOS7-env-clean.def reproduces the basic VM environment with OpenMPI 4.1.0, gc
 
 CentOS7-wrf-clean.def contains the recipe for building WRF 4.1.5 
 
+CentOS8-* reproduce the above for CentOS8. 
+
 ## Authors
 arstgr
 
